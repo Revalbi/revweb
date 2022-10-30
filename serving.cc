@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <sys/socket.h>
 
 int kepet_kuld(int fd) {
   std::ifstream input_file("dirtblock.png");
@@ -17,17 +18,19 @@ int kepet_kuld(int fd) {
     perror("Header irasa a kephez");
     return 1;
   }
-
+  int byte_count = 0;
   while (input_file) {
     char buf[4096];
+    std::cerr << "bikmak" << std::endl;
     input_file.read(buf, 4096);
     int rc = write(fd, buf, input_file.gcount());
     if (rc == -1) {
       perror("kep irasa");
       return 1;
     }
+    byte_count += rc;
   }
-
+  std::cerr << "byte_count: " << byte_count << std::endl;
   return 0;
 }
 
@@ -56,7 +59,7 @@ bool serve(int csckt) {
 
 
   if (query_path == "/kep.png") {
-    return kepet_kuld(csckt) == 0;
+    kepet_kuld(csckt);
   } else {
     std::string valasz = "HTTP/1.1 200 OK\r\n"
     "\r\n"
@@ -77,6 +80,18 @@ bool serve(int csckt) {
       std::cerr << "csak " << n_written << " karaktert tudtunk irni " << valasz.size() << " helyett." << std::endl;
       return false;
     }
+  }
+
+  // int rc = shutdown(csckt, SHUT_WR);
+  // if (rc == -1) {
+  //   perror("shutdown");
+  //   return false;
+  // }
+  
+  int rc = close(csckt);
+  if (rc == -1) {
+    perror("close");
+    return false;
   }
   return true;
 }
