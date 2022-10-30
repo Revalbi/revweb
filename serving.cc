@@ -1,31 +1,65 @@
-#include <fstream>
+#include <sys/socket.h>
 #include <unistd.h>
-#include <string>
+
+#include <fstream>
 #include <iostream>
 #include <sstream>
-#include <sys/socket.h>
+#include <string>
 
-int kepet_kuld(int fd) {
-  std::ifstream input_file("dirtblock.png");
+bool ellenoriz(std::string query_path) {
+  std::istringstream iss{query_path};
+  int melyseg = 0;
+  std::string komponens;
+  while (std::getline(iss, komponens, '/')) {
+    if (komponens == "..") {
+      --melyseg;
+    } else if (komponens != ".") {
+      ++melyseg;
+    }
+    if (melyseg < 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
-  const std::string kep_header =
-  "HTTP/1.1 200 OK\r\n"
-  "Content-Type: image/png\r\n"
-  "\r\n";
+std::string get_mime_type(std::string path) {
+  if (path.ends_with(".png")) {
+    return "image/png";
+  }
+  if (path.ends_with(".html")) {
+    return "text/html";
+  }
+  return "text/plain";
+}
 
-  int rc = write(fd, kep_header.data(), kep_header.size());
+int kiszolgal(int fd, std::string path) {
+  std::ifstream input_file(path);
+
+  std::string mime_type = get_mime_type(path);
+
+  std::ostringstream header;
+  header << "HTTP/1.1 200 OK\r\n"
+            "Content-Type: "
+         << mime_type
+         << "\r\n"
+            "\r\n";
+
+  std::string header_str = header.str();
+
+  int rc = write(fd, header_str.data(), header_str.size());
   if (rc == -1) {
-    perror("Header irasa a kephez");
+    perror("Header irasa");
     return 1;
   }
   int byte_count = 0;
   while (input_file) {
     char buf[4096];
-    std::cerr << "bikmak" << std::endl;
+
     input_file.read(buf, 4096);
     int rc = write(fd, buf, input_file.gcount());
     if (rc == -1) {
-      perror("kep irasa");
+      perror("file irasa");
       return 1;
     }
     byte_count += rc;
@@ -42,8 +76,8 @@ std::string get_query_path(std::string request) {
   return szo;
 }
 
-bool serve(int csckt) {
-    char buffer[4096];
+bool serve(int csckt, std::string www_dir) {
+  char buffer[4096];
   int n_read = read(csckt, buffer, 4095);
   if (n_read == -1) {
     perror("read");
@@ -57,37 +91,14 @@ bool serve(int csckt) {
   std::string query_path = get_query_path(kaptuk);
   std::cout << "query path: " << query_path << std::endl;
 
-
-  if (query_path == "/kep.png") {
-    kepet_kuld(csckt);
+  if (!ellenoriz(query_path)) {
+    std::cerr << "Tamado!: " << query_path << std::endl;
   } else {
-    std::string valasz = "HTTP/1.1 200 OK\r\n"
-    "\r\n"
-    "<html>\r\n"
-    "<body>\r\n"
-    "<h1>Elso weblapom</h1>\r\n"
-    "abrakadabra\r\n"
-    "</body\r\n>"
-    "</html>\r\n";
+    std::string path = www_dir + query_path;
 
-    int n_written = write(csckt, valasz.c_str(), valasz.size());
-    if (n_written == -1) {
-      perror("write");
-      return false;
-    }
-
-    if (n_written != (int)valasz.size()) {
-      std::cerr << "csak " << n_written << " karaktert tudtunk irni " << valasz.size() << " helyett." << std::endl;
-      return false;
-    }
+    kiszolgal(csckt, path);
   }
 
-  // int rc = shutdown(csckt, SHUT_WR);
-  // if (rc == -1) {
-  //   perror("shutdown");
-  //   return false;
-  // }
-  
   int rc = close(csckt);
   if (rc == -1) {
     perror("close");
@@ -95,4 +106,3 @@ bool serve(int csckt) {
   }
   return true;
 }
-

@@ -11,6 +11,11 @@
 #include "serving.h"
 
 int main(int argc, char *argv[]) {
+  std::string www_dir = ".";
+  if (argc > 1) {
+    www_dir = argv[1];
+  }
+
   int sckt = socket(AF_INET, SOCK_STREAM, 0);
   if (sckt == -1) {
     perror("socket krealas");
@@ -50,7 +55,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    if (!serve(csckt)) {
+    if (!serve(csckt, www_dir)) {
       std::cerr << "nem sikerult kiszolgalni" << std::endl;
       return 1;
     }
