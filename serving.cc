@@ -30,6 +30,9 @@ std::string get_mime_type(std::string path) {
   if (path.ends_with(".html")) {
     return "text/html";
   }
+  if (path.ends_with(".css")) {
+    return "text/css";
+  }
   return "text/plain";
 }
 
